@@ -27,6 +27,11 @@ TEST(BigValueRouteTest, bigvalue) {
       facebook::memcache::MemcacheRouterInfo>();
 }
 
+TEST(BigValueRouteTest, bigvalueSecurityContext) {
+  facebook::memcache::mcrouter::testBigvalueSecurityContext<
+      facebook::memcache::MemcacheRouterInfo>();
+}
+
 TEST(BigValueRouteTest, chunksInfoParsing) {
   namespace mc = facebook::memcache::mcrouter;
   uint32_t version = 0, numChunks = 0;

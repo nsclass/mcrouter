@@ -82,6 +82,19 @@ class RequestCommon : public MessageCommon {
 
   void setKcbIdentity(folly::StringPiece kcbIdentity) noexcept;
 
+  /**
+   * Copies the security context (CAT, client identifier, KCB identity, privacy
+   * agentic context) from a parent request onto a sub-request derived from it.
+   *
+   * Route handles that build sub-requests from scratch rather than copying the
+   * parent (e.g. BigValueRoute chunk requests) must call this. Otherwise the
+   * sub-request reaches the server with no identity and, under KCB, the server
+   * falls back to the caller's TLS identity when folding the client id into the
+   * physical cache key -- so two services writing the same logical key produce
+   * different physical keys.
+   */
+  void copySecurityContextFrom(const RequestCommon& other) noexcept;
+
   const std::optional<folly::IPAddress>& getSourceIpAddr() const noexcept;
 
   void setSourceIpAddr(const folly::IPAddress& sourceIpAddr) noexcept;

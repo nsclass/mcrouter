@@ -220,6 +220,7 @@ std::vector<McGetRequest> BigValueRoute<RouterInfo>::chunkGetRequests(
     auto& bigGetReq =
         bigGetReqs.emplace_back(createChunkKey(baseKey, i, info.suffix()));
     bigGetReq.mcTenantId().copy_from(req.mcTenantId());
+    bigGetReq.copySecurityContextFrom(req);
     if constexpr (HasFlagsTrait<FromRequest>::value) {
       bigGetReq.flags_ref() = *req.flags_ref();
     }
@@ -282,6 +283,7 @@ BigValueRoute<RouterInfo>::chunkUpdateRequests(const Request& req) const {
     chunkReq.value_ref() = std::move(chunkValue);
     chunkReq.exptime_ref() = *req.exptime_ref();
     chunkReq.mcTenantId().copy_from(req.mcTenantId());
+    chunkReq.copySecurityContextFrom(req);
     chunkReq.flags_ref() = *req.flags_ref();
   }
 
@@ -341,6 +343,8 @@ McLeaseGetReply BigValueRoute<RouterInfo>::doLeaseGetRoute(
   const auto key = req.key()->fullKey();
   McGetsRequest getsMetadataReq(key);
   getsMetadataReq.flags() = *req.flags();
+  getsMetadataReq.mcTenantId().copy_from(req.mcTenantId());
+  getsMetadataReq.copySecurityContextFrom(req);
   const auto reqs = chunkGetRequests(req, chunksInfo);
   std::vector<std::function<McGetReply()>> fs;
   fs.reserve(reqs.size());
@@ -389,6 +393,8 @@ McLeaseGetReply BigValueRoute<RouterInfo>::doLeaseGetRoute(
     invalidateReq.exptime() = -1;
     invalidateReq.casToken() = *getsMetadataReply.casToken();
     invalidateReq.flags() = *req.flags();
+    invalidateReq.mcTenantId().copy_from(req.mcTenantId());
+    invalidateReq.copySecurityContextFrom(req);
     auto invalidateReply = ch_->route(invalidateReq);
     if (isErrorResult(*invalidateReply.result_ref())) {
       McLeaseGetReply errorReply(*invalidateReply.result_ref());

@@ -102,6 +102,14 @@ void RequestCommon::setKcbIdentity(folly::StringPiece kcbIdentity) noexcept {
   kcbIdentity_ = kcbIdentity.str();
 }
 
+void RequestCommon::copySecurityContextFrom(
+    const RequestCommon& other) noexcept {
+  cryptoAuthToken_ = other.cryptoAuthToken_;
+  clientIdentifier_ = other.clientIdentifier_;
+  kcbIdentity_ = other.kcbIdentity_;
+  privacyLibAgenticContext_ = other.privacyLibAgenticContext_;
+}
+
 const std::optional<folly::IPAddress>& RequestCommon::getSourceIpAddr()
     const noexcept {
   return sourceIpAddr_;

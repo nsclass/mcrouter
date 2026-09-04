@@ -348,6 +348,83 @@ void testBigvalue() {
   }});
 }
 
+template <class RouterInfo>
+void testBigvalueSecurityContext() {
+  using TestHandle = TestHandleImpl<typename RouterInfo::RouteHandleIf>;
+  // Chunk sub-requests are built from scratch rather than copied from the
+  // parent, so they must be given the parent's identity explicitly. Without it
+  // the backend binds chunk keys to the writer's TLS identity under KCB, and
+  // two services writing the same logical key produce different chunk keys.
+  const std::string kcb_identity = "memcache_test_acl";
+  const std::string crypto_auth_token = "serialized-cat";
+  const std::string client_identifier = "hashed-tls-identity";
+
+  const std::string rand_suffix_get = "123456";
+  const size_t num_chunks = 10;
+  const auto init_reply = fmt::format(
+      "{}-{}-{}", BIG_VALUE_ROUTE_TEST_VERSION, num_chunks, rand_suffix_get);
+  std::vector<std::shared_ptr<TestHandle>> testHandles{
+      std::make_shared<TestHandle>(GetRouteTestData(
+          carbon::Result::FOUND, init_reply, MC_MSG_FLAG_BIG_VALUE)),
+      std::make_shared<TestHandle>(
+          UpdateRouteTestData(carbon::Result::STORED))};
+  auto routeHandles = get_route_handles(testHandles);
+
+  const std::string keyGet = "bigvalue_get";
+  const std::string keySet = "bigvalue_set";
+
+  // The original key plus one sub-request per chunk, all under the same
+  // identity as the request that entered the route handle.
+  const std::vector<std::string> expected_kcb_identities(
+      num_chunks + 1, kcb_identity);
+  const std::vector<std::string> expected_crypto_auth_tokens(
+      num_chunks + 1, crypto_auth_token);
+  const std::vector<std::string> expected_client_identifiers(
+      num_chunks + 1, client_identifier);
+
+  TestFiberManager<RouterInfo> fm;
+  fm.runAll({[&]() {
+    { // Get path: original key, then the chunk gets
+      typename RouterInfo::template RouteHandle<BigValueRoute<RouterInfo>> rh(
+          routeHandles[0], BIG_VALUE_ROUTE_TEST_OPTS);
+
+      McGetRequest reqGet(keyGet);
+      reqGet.setKcbIdentity(kcb_identity);
+      reqGet.setCryptoAuthToken(std::string(crypto_auth_token));
+      reqGet.setClientIdentifier(client_identifier);
+
+      rh.route(reqGet);
+
+      EXPECT_EQ(expected_kcb_identities, testHandles[0]->sawKcbIdentities);
+      EXPECT_EQ(
+          expected_crypto_auth_tokens, testHandles[0]->sawCryptoAuthTokens);
+      EXPECT_EQ(
+          expected_client_identifiers, testHandles[0]->sawClientIdentifiers);
+    }
+
+    { // Update path: the chunk sets, then the original key
+      typename RouterInfo::template RouteHandle<BigValueRoute<RouterInfo>> rh(
+          routeHandles[1], BIG_VALUE_ROUTE_TEST_OPTS);
+
+      McSetRequest reqSet(keySet);
+      reqSet.value() = folly::IOBuf(
+          folly::IOBuf::COPY_BUFFER,
+          std::string(BIG_VALUE_ROUTE_TEST_THRESHOLD * num_chunks, 't'));
+      reqSet.setKcbIdentity(kcb_identity);
+      reqSet.setCryptoAuthToken(std::string(crypto_auth_token));
+      reqSet.setClientIdentifier(client_identifier);
+
+      rh.route(reqSet);
+
+      EXPECT_EQ(expected_kcb_identities, testHandles[1]->sawKcbIdentities);
+      EXPECT_EQ(
+          expected_crypto_auth_tokens, testHandles[1]->sawCryptoAuthTokens);
+      EXPECT_EQ(
+          expected_client_identifiers, testHandles[1]->sawClientIdentifiers);
+    }
+  }});
+}
+
 } // namespace mcrouter
 } // namespace memcache
 } // namespace facebook

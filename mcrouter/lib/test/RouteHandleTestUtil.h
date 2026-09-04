@@ -165,6 +165,10 @@ struct TestHandleImpl {
 
   std::vector<std::string> sawClientIdentifiers;
 
+  std::vector<std::string> sawKcbIdentities;
+
+  std::vector<std::string> sawCryptoAuthTokens;
+
   bool isTko;
 
   bool isPaused;
@@ -398,6 +402,8 @@ struct RecordingRoute {
     h_->saw_keys.push_back(req.key_ref()->fullKey().str());
     h_->sawOperations.push_back(Request::name);
     h_->sawClientIdentifiers.push_back(req.getClientIdentifier().value_or(""));
+    h_->sawKcbIdentities.push_back(req.getKcbIdentity().value_or(""));
+    h_->sawCryptoAuthTokens.push_back(req.getCryptoAuthToken().value_or(""));
     h_->sawExptimes.push_back(getExptimeIfExist(req));
     h_->sawFlags.push_back(getFlagsIfExist(req));
     h_->sawQueryTags.push_back(getQueryTagsIfExists(req));
